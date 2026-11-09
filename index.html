@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบบริหารจัดการเบิก-คืนกุญแจล็อกเกอร์ (Locker Key Management System)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts - Sarabun -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap">
+    <!-- SheetJS / XLSX for Excel Export & Import -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    
+    <style>
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #f8fafc;
+        }
+        /* Scrollbar styling for dynamic lists */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased bg-slate-50 min-h-screen flex flex-col">
+
+    <!-- Top Navigation / Header -->
+    <header class="bg-slate-900 text-white shadow-lg sticky top-0 z-30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="bg-indigo-600 p-2.5 rounded-xl shadow-md">
+                    <i class="fa-solid fa-key text-xl text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg sm:text-xl font-bold leading-tight">ระบบบริหารจัดการเบิก-คืนกุญแจล็อกเกอร์</h1>
+                    <p class="text-xs text-slate-400 hidden sm:block">Locker Key Management System (ชาย M01-M95 / หญิง F01-F95)</p>
+                </div>
+            </div>
+
+            <!-- Action Buttons for Data Export / Import -->
+            <div class="flex items-center space-x-2">
+                <button onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm px-3 py-2 rounded-lg font-medium transition flex items-center space-x-1.5 shadow-sm">
+                    <i class="fa-solid fa-file-excel"></i>
+                    <span class="hidden md:inline">ส่งออก</span> Excel
+                </button>
+                <button onclick="openBackupModal()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs sm:text-sm px-3 py-2 rounded-lg font-medium transition flex items-center space-x-1.5">
+                    <i class="fa-solid fa-database"></i>
+                    <span class="hidden md:inline">สำรองข้อมูล</span> JSON
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow w-full">
+
+        <!-- Overview KPI Stats Bar -->
+        <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-slate-500 font-medium">ตู้ล็อกเกอร์ทั้งหมด</p>
+                    <p class="text-2xl font-bold text-slate-800" id="stat-total">190</p>
+                    <span class="text-[11px] text-slate-400">ชาย 95 | หญิง 95</span>
+                </div>
+                <div class="bg-slate-100 text-slate-600 p-3 rounded-lg"><i class="fa-solid fa-boxes-stacked text-xl"></i></div>
+            </div>
+            
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-slate-500 font-medium">กุญแจครบ (ว่าง)</p>
+                    <p class="text-2xl font-bold text-emerald-600" id="stat-available">0</p>
+                    <span class="text-[11px] text-emerald-500 font-medium">พร้อมใช้งาน</span>
+                </div>
+                <div class="bg-emerald-50 text-emerald-600 p-3 rounded-lg"><i class="fa-solid fa-circle-check text-xl"></i></div>
+            </div>
+
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-slate-500 font-medium">ถูกเบิกกุญแจอยู่</p>
+                    <p class="text-2xl font-bold text-amber-600" id="stat-borrowed">0</p>
+                    <span class="text-[11px] text-amber-500 font-medium">มีการถือครอง</span>
+                </div>
+                <div class="bg-amber-50 text-amber-600 p-3 rounded-lg"><i class="fa-solid fa-key text-xl"></i></div>
+            </div>
+
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-slate-500 font-medium">แจ้งตู้ชำรุด</p>
+                    <p class="text-2xl font-bold text-rose-600" id="stat-damaged">0</p>
+                    <span class="text-[11px] text-rose-500 font-medium">ต้องซ่อมแซม</span>
+                </div>
+                <div class="bg-rose-50 text-rose-600 p-3 rounded-lg"><i class="fa-solid fa-triangle-exclamation text-xl"></i></div>
+            </div>
+
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 col-span-2 sm:col-span-2 lg:col-span-1 flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-slate-500 font-medium">ดอกสำรองถูกใช้งาน</p>
+                    <p class="text-2xl font-bold text-purple-600" id="stat-spare-used">0</p>
+                    <span class="text-[11px] text-purple-500 font-medium">เบิกดอกสำรอง</span>
+                </div>
+                <div class="bg-purple-50 text-purple-600 p-3 rounded-lg"><i class="fa-solid fa-shield-cat text-xl"></i></div>
+            </div>
+        </div>
+
+        <!-- Controls Header: Tabs, Search & Filters -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-6">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                
+                <!-- Male / Female Tab Switcher -->
+                <div class="inline-flex p-1 bg-slate-100 rounded-xl">
+                    <button id="tab-male" onclick="switchZone('M')" class="px-5 py-2.5 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center space-x-2 bg-white text-indigo-600 shadow-sm">
+                        <i class="fa-solid fa-mars text-base"></i>
+                        <span>ล็อกเกอร์ชาย (M01-M95)</span>
+                        <span id="badge-male-count" class="bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full ml-1">95</span>
+                    </button>
+                    <button id="tab-female" onclick="switchZone('F')" class="px-5 py-2.5 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center space-x-2 text-slate-600 hover:text-slate-900">
+                        <i class="fa-solid fa-venus text-base"></i>
+                        <span>ล็อกเกอร์หญิง (F01-F95)</span>
+                        <span id="badge-female-count" class="bg-slate-200 text-slate-700 text-xs px-2 py-0.5 rounded-full ml-1">95</span>
+                    </button>
+                </div>
+
+                <!-- Search and Filter Bar -->
+                <div class="flex flex-wrap items-center gap-2">
+                    <div class="relative flex-grow sm:flex-grow-0 sm:w-64">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                        <input type="text" id="search-input" oninput="renderLockers()" placeholder="ค้นหารหัสตู้, ชื่อพนักงาน..." class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition">
+                    </div>
+                    <select id="filter-status" onchange="renderLockers()" class="bg-slate-50 border border-slate-200 rounded-lg text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option value="ALL">สถานะทั้งหมด</option>
+                        <option value="AVAILABLE">ว่าง (กุญแจครบ)</option>
+                        <option value="BORROWED">มีการเบิกกุญแจ</option>
+                        <option value="DAMAGED">แจ้งตู้ชำรุด</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Legend Status Indicators -->
+            <div class="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center gap-4 text-xs text-slate-600">
+                <span class="font-medium text-slate-400">คำอธิบายสถานะ:</span>
+                <div class="flex items-center space-x-1.5">
+                    <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
+                    <span>ว่าง (มีกุญแจ 2 ดอก)</span>
+                </div>
+                <div class="flex items-center space-x-1.5">
+                    <span class="w-3 h-3 rounded-full bg-amber-500"></span>
+                    <span>เบิกกุญแจหลัก</span>
+                </div>
+                <div class="flex items-center space-x-1.5">
+                    <span class="w-3 h-3 rounded-full bg-purple-500"></span>
+                    <span>เบิกกุญแจสำรอง</span>
+                </div>
+                <div class="flex items-center space-x-1.5">
+                    <span class="w-3 h-3 rounded-full bg-rose-500"></span>
+                    <span>เบิกกุญแจทั้ง 2 ดอก</span>
+                </div>
+                <div class="flex items-center space-x-1.5">
+                    <span class="w-3 h-3 rounded-full bg-slate-400"></span>
+                    <span>แจ้งตู้ชำรุด</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Locker Grid Display & Recent Log split view -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- Left 2 columns: Locker Grid -->
+            <div class="lg:col-span-2 bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="font-bold text-slate-800 text-base flex items-center space-x-2">
+                        <i class="fa-solid fa-grip text-indigo-600"></i>
+                        <span id="grid-title">ตารางผังล็อกเกอร์ชาย (M01 - M95)</span>
+                    </h2>
+                    <span class="text-xs text-slate-400">คลิกที่ตู้เพื่อทำรายการ (เบิก / คืน / ชำรุด)</span>
+                </div>
+
+                <!-- Interactive Visual Locker Grid Container -->
+                <div id="locker-grid" class="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 xl:grid-cols-8 gap-2.5 max-h-[620px] overflow-y-auto p-1">
+                    <!-- Rendered Javascript Locker Tiles Here -->
+                </div>
+            </div>
+
+            <!-- Right 1 column: Audit Transaction Logs -->
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col">
+                <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
+                    <h2 class="font-bold text-slate-800 text-base flex items-center space-x-2">
+                        <i class="fa-solid fa-clock-rotate-left text-indigo-600"></i>
+                        <span>ประวัติการทำรายการล่าสุด</span>
+                    </h2>
+                    <span class="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium" id="log-count-badge">0 รายการ</span>
+                </div>
+
+                <!-- Transaction Log List -->
+                <div id="log-list" class="space-y-3 flex-grow overflow-y-auto max-h-[550px] pr-1">
+                    <!-- Log entries loaded via JS -->
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal: Locker Action Dialog (Borrow / Return / Repair) -->
+    <div id="locker-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl shadow-xl border border-slate-100 max-w-lg w-full overflow-hidden transform transition-all duration-200 scale-95 opacity-0" id="modal-container">
+            
+            <!-- Modal Header -->
+            <div class="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-indigo-600 w-10 h-10 rounded-xl flex items-center justify-center font-bold text-lg" id="modal-locker-code">
+                        M01
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-base" id="modal-locker-title">จัดการล็อกเกอร์ M01</h3>
+                        <p class="text-xs text-slate-400" id="modal-locker-sub">โซนล็อกเกอร์ชาย</p>
+                    </div>
+                </div>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-white p-1 transition">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+
+            <!-- Modal Content Tabs (Action Types) -->
+            <div class="p-6">
+                <!-- Status Details Card inside Modal -->
+                <div id="modal-status-card" class="mb-5 p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1.5">
+                    <!-- Loaded dynamically via JS -->
+                </div>
+
+                <!-- Action Selector Buttons -->
+                <div class="grid grid-cols-3 gap-2 mb-5">
+                    <button type="button" onclick="setModalTab('BORROW')" id="btn-tab-borrow" class="py-2.5 px-3 rounded-lg text-xs font-semibold border border-slate-200 hover:bg-slate-50 transition flex flex-col items-center gap-1">
+                        <i class="fa-solid fa-key text-base text-amber-500"></i>
+                        <span>เบิกกุญแจ</span>
+                    </button>
+                    <button type="button" onclick="setModalTab('RETURN')" id="btn-tab-return" class="py-2.5 px-3 rounded-lg text-xs font-semibold border border-slate-200 hover:bg-slate-50 transition flex flex-col items-center gap-1">
+                        <i class="fa-solid fa-rotate-left text-base text-emerald-500"></i>
+                        <span>คืนกุญแจ</span>
+                    </button>
+                    <button type="button" onclick="setModalTab('REPAIR')" id="btn-tab-repair" class="py-2.5 px-3 rounded-lg text-xs font-semibold border border-slate-200 hover:bg-slate-50 transition flex flex-col items-center gap-1">
+                        <i class="fa-solid fa-wrench text-base text-rose-500"></i>
+                        <span>แจ้ง/ปลดชำรุด</span>
+                    </button>
+                </div>
+
+                <!-- FORM: Borrow Key -->
+                <form id="form-borrow" onsubmit="handleBorrowSubmit(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">กุญแจที่ต้องการเบิก <span class="text-rose-500">*</span></label>
+                        <select id="borrow-key-type" required class="w-full bg-slate-50 border border-slate-300 rounded-lg text-sm p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            <option value="MAIN">ดอกใช้งานหลัก (Key #1)</option>
+                            <option value="SPARE">ดอกสำรอง (Key #2)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">ชื่อ-นามสกุล พนักงาน <span class="text-rose-500">*</span></label>
+                        <input type="text" id="borrow-emp-name" required placeholder="ตัวอย่าง: สมชาย ใจดี" class="w-full bg-slate-50 border border-slate-300 rounded-lg text-sm p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">แผนก / ฝ่ายงาน <span class="text-rose-500">*</span></label>
+                        <input type="text" id="borrow-emp-dept" required placeholder="ตัวอย่าง: ไอที / ฝ่ายผลิต / บุคคล" class="w-full bg-slate-50 border border-slate-300 rounded-lg text-sm p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">หมายเหตุเพิ่มเติม (ถ้ามี)</label>
+                        <input type="text" id="borrow-note" placeholder="ตัวอย่าง: เบิกสำรองเนื่องจากทำกุญแจหลักหาย" class="w-full bg-slate-50 border border-slate-300 rounded-lg text-sm p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                    <div class="pt-2">
+                        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-4 rounded-lg shadow transition text-sm flex items-center justify-center space-x-2">
+                            <i class="fa-solid fa-paper-plane"></i>
+                            <span>ยืนยันการเบิกกุญแจ</span>
+                        </button>
+                    </div>
+                </form>
+
+                <!-- FORM: Return Key -->
+                <form id="form-return" onsubmit="handleReturnSubmit(event)" class="space-y-4 hidden">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">เลือกรายการกุญแจที่ต้องการคืน <span class="text-rose-500">*</span></label>
+                        <select id="return-key-type" required class="w-full bg-slate-50 border border-slate-300 rounded-lg text-sm p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            <!-- Populated dynamically via JS -->
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">หมายเหตุตอนคืน (ถ้ามี)</label>
+                        <input type="text" id="return-note" placeholder="ตัวอย่าง: คืนกุญแจตามปกติ" class="w-full bg-slate-50 border border-slate-300 rounded-lg text-sm p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                    <div class="pt-2">
+                        <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 px-4 rounded-lg shadow transition text-sm flex items-center justify-center space-x-2">
+                            <i class="fa-solid fa-rotate-left"></i>
+                            <span>บันทึกคืนกุญแจ</span>
+                        </button>
+                    </div>
+                </form>
+
+                <!-- FORM: Repair / Damage Locker -->
+                <form id="form-repair" onsubmit="handleRepairSubmit(event)" class="space-y-4 hidden">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">สถานะการชำรุด <span class="text-rose-500">*</span></label>
+                        <select id="repair-status-action" required onchange="toggleRepairNote(this.value)" class="w-full bg-slate-50 border border-slate-300 rounded-lg text-sm p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            <option value="MARK_DAMAGED">แจ้งตู้ชำรุด (งดใช้งาน)</option>
+                            <option value="CLEAR_DAMAGED">ซ่อมแซมเสร็จแล้ว (เปิดใช้งานปกติ)</option>
+                        </select>
+                    </div>
+                    <div id="repair-reason-container">
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">รายละเอียดการชำรุด / อาการเสีย <span class="text-rose-500">*</span></label>
+                        <textarea id="repair-note" rows="3" placeholder="ตัวอย่าง: ตัวล็อกชำรุด, ประตูตู้ตกหล่น, แม่กุญแจติดขัด" class="w-full bg-slate-50 border border-slate-300 rounded-lg text-sm p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
+                    </div>
+                    <div class="pt-2">
+                        <button type="submit" class="w-full bg-rose-600 hover:bg-rose-700 text-white font-semibold py-2.5 px-4 rounded-lg shadow transition text-sm flex items-center justify-center space-x-2">
+                            <i class="fa-solid fa-wrench"></i>
+                            <span>บันทึกสถานะชำรุด / ซ่อมแซม</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: JSON Backup & Import / Export -->
+    <div id="backup-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl shadow-xl border border-slate-100 max-w-md w-full overflow-hidden p-6">
+            <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
+                <h3 class="font-bold text-base text-slate-800 flex items-center space-x-2">
+                    <i class="fa-solid fa-database text-indigo-600"></i>
+                    <span>สำรองข้อมูล / นำเข้าข้อมูล (Backup & Restore)</span>
+                </h3>
+                <button onclick="closeBackupModal()" class="text-slate-400 hover:text-slate-700">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            
+            <p class="text-xs text-slate-500 mb-4">
+                คุณสามารถดาวน์โหลดข้อมูลล็อกเกอร์และประวัติทั้งหมดเก็บเป็นไฟล์ JSON ไว้สำหรับย้ายเครื่อง หรือนำมาเปิดใช้งานออนไลน์ได้ฟรี
+            </p>
+
+            <div class="space-y-3">
+                <button onclick="downloadJSONBackup()" class="w-full bg-slate-800 hover:bg-slate-700 text-white font-medium py-2.5 px-4 rounded-lg text-sm transition flex items-center justify-center space-x-2">
+                    <i class="fa-solid fa-download"></i>
+                    <span>ดาวน์โหลดไฟล์สำรองข้อมูล (.json)</span>
+                </button>
+
+                <div class="relative flex py-1 items-center">
+                    <div class="flex-grow border-t border-slate-200"></div>
+                    <span class="flex-shrink mx-3 text-xs text-slate-400">หรือนำเข้าไฟล์</span>
+                    <div class="flex-grow border-t border-slate-200"></div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">เลือกไฟล์ JSON สำรอง</label>
+                    <input type="file" id="import-json-file" accept=".json" class="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer">
+                </div>
+
+                <button onclick="restoreJSONBackup()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-4 rounded-lg text-sm transition flex items-center justify-center space-x-2">
+                    <i class="fa-solid fa-upload"></i>
+                    <span>นำเข้าข้อมูลจากไฟล์ JSON</span>
+                </button>
+
+                <div class="pt-2">
+                    <button onclick="confirmResetData()" class="w-full bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-medium py-2 px-3 rounded-lg transition border border-rose-200">
+                        <i class="fa-solid fa-trash-arrow-up mr-1"></i> รีเซ็ตตั้งค่าเริ่มต้นทั้งหมด (Reset System)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast Element -->
+    <div id="toast" class="fixed bottom-5 right-5 z-50 bg-slate-900 text-white text-xs sm:text-sm px-4 py-3 rounded-xl shadow-xl flex items-center space-x-3 transform transition-all duration-300 translate-y-10 opacity-0 pointer-events-none">
+        <i id="toast-icon" class="fa-solid fa-circle-check text-emerald-400 text-base"></i>
+        <span id="toast-msg">บันทึกข้อมูลเรียบร้อยแล้ว</span>
+    </div>
+
+    <!-- Application Script Implementation -->
+    <script>
+        // Storage keys
+        const STORAGE_LOCKERS_KEY = 'locker_system_lockers_v1';
+        const STORAGE_LOGS_KEY = 'locker_system_logs_v1';
+
+        // Current UI state
+        let activeZone = 'M'; // 'M' = Male, 'F' = Female
+        let activeModalLockerId = null;
+        let lockersData = {};
+        let logsData = [];
+
+        // Application Initializer
+        window.onload = function() {
+            initSystemData();
+            switchZone('M');
+            updateKPIs();
+            renderLogs();
+        };
+
+        // Initialize Data Structure for 95 Male (M01-M95) & 95 Female (F01-F95) Lockers
+        function initSystemData() {
+            const savedLockers = localStorage.getItem(STORAGE_LOCKERS_KEY);
+            const savedLogs = localStorage.getItem(STORAGE_LOGS_KEY);
+
+            if (savedLockers) {
+                try {
+                    lockersData = JSON.parse(savedLockers);
+                } catch (e) {
+                    console.error("Failed to parse stored lockers", e);
+                    generateDefaultLockers();
+                }
+            } else {
+                generateDefaultLockers();
+            }
+
+            if (savedLogs) {
+                try {
+                    logsData = JSON.parse(savedLogs);
+                } catch (e) {
+                    logsData = [];
+                }
+            } else {
+                logsData = [];
+            }
+        }
+
+        // Generate 95 Male & 95 Female default lockers data
+        function generateDefaultLockers() {
+            lockersData = {};
+            
+            // Male M01 - M95
+            for (let i = 1; i <= 95; i++) {
+                const code = 'M' + String(i).padStart(2, '0');
+                lockersData[code] = {
+                    id: code,
+                    gender: 'M',
+                    number: i,
+                    isDamaged: false,
+                    damageReason: '',
+                    mainKey: { isBorrowed: false, borrowerName: '', department: '', borrowTime: null, note: '' },
+                    spareKey: { isBorrowed: false, borrowerName: '', department: '', borrowTime: null, note: '' }
+                };
+            }
+
+            // Female F01 - F95
+            for (let i = 1; i <= 95; i++) {
+                const code = 'F' + String(i).padStart(2, '0');
+                lockersData[code] = {
+                    id: code,
+                    gender: 'F',
+                    number: i,
+                    isDamaged: false,
+                    damageReason: '',
+                    mainKey: { isBorrowed: false, borrowerName: '', department: '', borrowTime: null, note: '' },
+                    spareKey: { isBorrowed: false, borrowerName: '', department: '', borrowTime: null, note: '' }
+                };
+            }
+            saveDataToLocalStorage();
+        }
+
+        function saveDataToLocalStorage() {
+            localStorage.setItem(STORAGE_LOCKERS_KEY, JSON.stringify(lockersData));
+            localStorage.setItem(STORAGE_LOGS_KEY, JSON.stringify(logsData));
+        }
+
+        // Tab Switching Handler (Male M vs Female F)
+        function switchZone(zone) {
+            activeZone = zone;
+            const btnMale = document.getElementById('tab-male');
+            const btnFemale = document.getElementById('tab-female');
+            const title = document.getElementById('grid-title');
+
+            if (zone === 'M') {
+                btnMale.className = "px-5 py-2.5 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center space-x-2 bg-white text-indigo-600 shadow-sm";
+                btnFemale.className = "px-5 py-2.5 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center space-x-2 text-slate-600 hover:text-slate-900";
+                title.innerText = "ตารางผังล็อกเกอร์ชาย (M01 - M95)";
+            } else {
+                btnFemale.className = "px-5 py-2.5 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center space-x-2 bg-white text-indigo-600 shadow-sm";
+                btnMale.className = "px-5 py-2.5 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center space-x-2 text-slate-600 hover:text-slate-900";
+                title.innerText = "ตารางผังล็อกเกอร์หญิง (F01 - F95)";
+            }
+
+            renderLockers();
+        }
+
+        // Render Locker Grid Tiles
+        function renderLockers() {
+            const gridContainer = document.getElementById('locker-grid');
+            gridContainer.innerHTML = '';
+
+            const searchTerm = document.getElementById('search-input').value.trim().toLowerCase();
+            const filterStatus = document.getElementById('filter-status').value;
+
+            // Filter by active zone (M or F)
+            const filteredIds = Object.keys(lockersData).filter(id => {
+                const locker = lockersData[id];
+                if (locker.gender !== activeZone) return false;
+
+                // Search Filter
+                if (searchTerm) {
+                    const matchId = locker.id.toLowerCase().includes(searchTerm);
+                    const matchMain = locker.mainKey.borrowerName.toLowerCase().includes(searchTerm) || locker.mainKey.department.toLowerCase().includes(searchTerm);
+                    const matchSpare = locker.spareKey.borrowerName.toLowerCase().includes(searchTerm) || locker.spareKey.department.toLowerCase().includes(searchTerm);
+                    if (!matchId && !matchMain && !matchSpare) return false;
+                }
+
+                // Status Filter
+                if (filterStatus === 'AVAILABLE') {
+                    return !locker.isDamaged && !locker.mainKey.isBorrowed && !locker.spareKey.isBorrowed;
+                }
+                if (filterStatus === 'BORROWED') {
+                    return locker.mainKey.isBorrowed || locker.spareKey.isBorrowed;
+                }
+                if (filterStatus === 'DAMAGED') {
+                    return locker.isDamaged;
+                }
+
+                return true;
+            });
+
+            if (filteredIds.length === 0) {
+                gridContainer.innerHTML = `
+                    <div class="col-span-full py-12 text-center text-slate-400">
+                        <i class="fa-regular fa-folder-open text-4xl mb-2"></i>
+                        <p class="text-sm">ไม่พบข้อมูลตู้ล็อกเกอร์ตามเงื่อนไขที่ค้นหา</p>
+                    </div>
+                `;
+                return;
+            }
+
+            filteredIds.sort().forEach(id => {
+                const locker = lockersData[id];
+                const tile = createLockerTile(locker);
+                gridContainer.appendChild(tile);
+            });
+        }
+
+        // Build Locker Tile Visual Component
+        function createLockerTile(locker) {
+            const div = document.createElement('div');
+            
+            // Determine Color States
+            // Green = Available (Both keys in)
+            // Amber = Main key borrowed
+            // Purple = Spare key borrowed
+            // Red = Both keys borrowed
+            // Gray/Slate = Damaged
+            let bgColor = "bg-emerald-50 text-emerald-800 border-emerald-200 hover:border-emerald-400";
+            let badgeBg = "bg-emerald-500 text-white";
+            let statusText = "ว่าง 2 ดอก";
+            let statusIcon = "fa-check";
+
+            if (locker.isDamaged) {
+                bgColor = "bg-slate-100 text-slate-600 border-slate-300 hover:border-slate-400";
+                badgeBg = "bg-slate-500 text-white";
+                statusText = "แจ้งชำรุด";
+                statusIcon = "fa-wrench";
+            } else if (locker.mainKey.isBorrowed && locker.spareKey.isBorrowed) {
+                bgColor = "bg-rose-50 text-rose-800 border-rose-300 hover:border-rose-400";
+                badgeBg = "bg-rose-600 text-white";
+                statusText = "เบิก 2 ดอก";
+                statusIcon = "fa-key";
+            } else if (locker.spareKey.isBorrowed && !locker.mainKey.isBorrowed) {
+                bgColor = "bg-purple-50 text-purple-900 border-purple-200 hover:border-purple-400";
+                badgeBg = "bg-purple-600 text-white";
+                statusText = "เบิกดอกสำรอง";
+                statusIcon = "fa-shield";
+            } else if (locker.mainKey.isBorrowed) {
+                bgColor = "bg-amber-50 text-amber-900 border-amber-200 hover:border-amber-400";
+                badgeBg = "bg-amber-500 text-white";
+                statusText = "เบิกดอกหลัก";
+                statusIcon = "fa-key";
+            }
+
+            // Display primary borrower name if borrowed
+            let borrowerDisplay = "";
+            if (locker.mainKey.isBorrowed) {
+                borrowerDisplay = locker.mainKey.borrowerName;
+            } else if (locker.spareKey.isBorrowed) {
+                borrowerDisplay = locker.spareKey.borrowerName;
+            }
+
+            div.className = `cursor-pointer rounded-xl border p-2.5 transition-all duration-150 transform hover:-translate-y-0.5 hover:shadow-md flex flex-col justify-between ${bgColor}`;
+            div.onclick = () => openLockerModal(locker.id);
+
+            div.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <span class="font-extrabold text-base tracking-tight">${locker.id}</span>
+                    <span class="text-[10px] ${badgeBg} font-medium px-1.5 py-0.5 rounded-full flex items-center gap-1">
+                        <i class="fa-solid ${statusIcon}"></i>
+                    </span>
+                </div>
+                <div class="mt-2 text-[11px] truncate font-medium">
+                    ${locker.isDamaged 
+                        ? `<span class="text-slate-500 italic"><i class="fa-solid fa-triangle-exclamation mr-1"></i>ชำรุด</span>`
+                        : (borrowerDisplay 
+                            ? `<span class="truncate block"><i class="fa-solid fa-user text-[10px] mr-1 opacity-70"></i>${borrowerDisplay}</span>`
+                            : `<span class="text-emerald-700 opacity-80">พร้อมใช้งาน</span>`
+                          )
+                    }
+                </div>
+                <div class="mt-1.5 pt-1 border-t border-black/5 flex items-center justify-between text-[10px] opacity-75">
+                    <span>กุญแจ 1: ${locker.mainKey.isBorrowed ? '<i class="fa-solid fa-xmark text-rose-600"></i>' : '<i class="fa-solid fa-check text-emerald-600"></i>'}</span>
+                    <span>กุญแจ 2: ${locker.spareKey.isBorrowed ? '<i class="fa-solid fa-xmark text-rose-600"></i>' : '<i class="fa-solid fa-check text-emerald-600"></i>'}</span>
+                </div>
+            `;
+            return div;
+        }
+
+        // Open Action Modal for Specific Locker
+        function openLockerModal(lockerId) {
+            activeModalLockerId = lockerId;
+            const locker = lockersData[lockerId];
+            
+            document.getElementById('modal-locker-code').innerText = locker.id;
+            document.getElementById('modal-locker-title').innerText = `จัดการล็อกเกอร์หมายเลข ${locker.id}`;
+            document.getElementById('modal-locker-sub').innerText = locker.gender === 'M' ? 'โซนล็อกเกอร์ชาย' : 'โซนล็อกเกอร์หญิง';
+
+            // Populate Status Summary inside modal
+            let statusHtml = `
+                <div class="flex items-center justify-between font-semibold border-b border-slate-200 pb-1.5 mb-1.5">
+                    <span>สถานะตู้ปัจจุบัน:</span>
+                    <span>${locker.isDamaged ? '<span class="text-rose-600"><i class="fa-solid fa-triangle-exclamation"></i> ชำรุด</span>' : '<span class="text-emerald-600"><i class="fa-solid fa-circle-check"></i> ปกติ</span>'}</span>
+                </div>
+            `;
+
+            if (locker.isDamaged) {
+                statusHtml += `<p class="text-rose-600"><strong>สาเหตุการชำรุด:</strong> ${locker.damageReason || 'ไม่ได้ระบุ'}</p>`;
+            }
+
+            statusHtml += `
+                <div class="grid grid-cols-2 gap-2 mt-2">
+                    <div class="p-2 rounded bg-white border border-slate-200">
+                        <p class="font-bold text-slate-700">ดอกใช้งานหลัก (Key #1)</p>
+                        <p>${locker.mainKey.isBorrowed 
+                            ? `<span class="text-amber-600 font-medium">ถูกเบิกโดย: ${locker.mainKey.borrowerName} (${locker.mainKey.department})</span>` 
+                            : '<span class="text-emerald-600">อยู่ที่ตู้ (ว่าง)</span>'}</p>
+                    </div>
+                    <div class="p-2 rounded bg-white border border-slate-200">
+                        <p class="font-bold text-slate-700">ดอกสำรอง (Key #2)</p>
+                        <p>${locker.spareKey.isBorrowed 
+                            ? `<span class="text-purple-600 font-medium">ถูกเบิกโดย: ${locker.spareKey.borrowerName} (${locker.spareKey.department})</span>` 
+                            : '<span class="text-emerald-600">อยู่ที่ตู้ (ว่าง)</span>'}</p>
+                    </div>
+                </div>
+            `;
+            document.getElementById('modal-status-card').innerHTML = statusHtml;
+
+            // Decide initial modal tab
+            if (locker.mainKey.isBorrowed || locker.spareKey.isBorrowed) {
+                setModalTab('RETURN');
+            } else {
+                setModalTab('BORROW');
+            }
+
+            // Show Modal UI
+            const modal = document.getElementById('locker-modal');
+            const container = document.getElementById('modal-container');
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                container.classList.remove('scale-95', 'opacity-0');
+                container.classList.add('scale-100', 'opacity-100');
+            }, 10);
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('locker-modal');
+            const container = document.getElementById('modal-container');
+            container.classList.remove('scale-100', 'opacity-100');
+            container.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                activeModalLockerId = null;
+            }, 200);
+        }
+
+        // Switch Forms inside Modal
+        function setModalTab(tabName) {
+            const btnBorrow = document.getElementById('btn-tab-borrow');
+            const btnReturn = document.getElementById('btn-tab-return');
+            const btnRepair = document.getElementById('btn-tab-repair');
+
+            const formBorrow = document.getElementById('form-borrow');
+            const formReturn = document.getElementById('form-return');
+            const formRepair = document.getElementById('form-repair');
+
+            // Reset tab styles
+            [btnBorrow, btnReturn, btnRepair].forEach(b => {
+                b.className = "py-2.5 px-3 rounded-lg text-xs font-semibold border border-slate-200 hover:bg-slate-50 transition flex flex-col items-center gap-1 text-slate-600";
+            });
+
+            formBorrow.classList.add('hidden');
+            formReturn.classList.add('hidden');
+            formRepair.classList.add('hidden');
+
+            const locker = lockersData[activeModalLockerId];
+
+            if (tabName === 'BORROW') {
+                btnBorrow.className = "py-2.5 px-3 rounded-lg text-xs font-semibold border-2 border-indigo-600 bg-indigo-50 text-indigo-700 transition flex flex-col items-center gap-1 shadow-sm";
+                formBorrow.classList.remove('hidden');
+
+                // Populate available keys dropdown
+                const selectKey = document.getElementById('borrow-key-type');
+                selectKey.innerHTML = '';
+                if (!locker.mainKey.isBorrowed) {
+                    selectKey.innerHTML += `<option value="MAIN">ดอกใช้งานหลัก (Key #1)</option>`;
+                }
+                if (!locker.spareKey.isBorrowed) {
+                    selectKey.innerHTML += `<option value="SPARE">ดอกสำรอง (Key #2)</option>`;
+                }
+                if (locker.mainKey.isBorrowed && locker.spareKey.isBorrowed) {
+                    selectKey.innerHTML = `<option value="" disabled selected>กุญแจถูกเบิกครบแล้วทั้ง 2 ดอก</option>`;
+                }
+
+                document.getElementById('borrow-emp-name').value = '';
+                document.getElementById('borrow-emp-dept').value = '';
+                document.getElementById('borrow-note').value = '';
+
+            } else if (tabName === 'RETURN') {
+                btnReturn.className = "py-2.5 px-3 rounded-lg text-xs font-semibold border-2 border-emerald-600 bg-emerald-50 text-emerald-700 transition flex flex-col items-center gap-1 shadow-sm";
+                formReturn.classList.remove('hidden');
+
+                // Populate return key select
+                const selectReturnKey = document.getElementById('return-key-type');
+                selectReturnKey.innerHTML = '';
+                if (locker.mainKey.isBorrowed) {
+                    selectReturnKey.innerHTML += `<option value="MAIN">ดอกใช้งานหลัก (ผู้เบิก: ${locker.mainKey.borrowerName})</option>`;
+                }
+                if (locker.spareKey.isBorrowed) {
+                    selectReturnKey.innerHTML += `<option value="SPARE">ดอกสำรอง (ผู้เบิก: ${locker.spareKey.borrowerName})</option>`;
+                }
+                if (!locker.mainKey.isBorrowed && !locker.spareKey.isBorrowed) {
+                    selectReturnKey.innerHTML = `<option value="" disabled selected>ไม่มีกุญแจที่ถูกเบิกอยู่ในขณะนี้</option>`;
+                }
+
+                document.getElementById('return-note').value = '';
+
+            } else if (tabName === 'REPAIR') {
+                btnRepair.className = "py-2.5 px-3 rounded-lg text-xs font-semibold border-2 border-rose-600 bg-rose-50 text-rose-700 transition flex flex-col items-center gap-1 shadow-sm";
+                formRepair.classList.remove('hidden');
+
+                document.getElementById('repair-status-action').value = locker.isDamaged ? 'CLEAR_DAMAGED' : 'MARK_DAMAGED';
+                document.getElementById('repair-note').value = locker.damageReason || '';
+                toggleRepairNote(document.getElementById('repair-status-action').value);
+            }
+        }
+
+        function toggleRepairNote(actionValue) {
+            const container = document.getElementById('repair-reason-container');
+            const noteInput = document.getElementById('repair-note');
+            if (actionValue === 'MARK_DAMAGED') {
+                container.classList.remove('hidden');
+                noteInput.setAttribute('required', 'true');
+            } else {
+                container.classList.add('hidden');
+                noteInput.removeAttribute('required');
+            }
+        }
+
+        // Action Handlers (Borrow Submit)
+        function handleBorrowSubmit(e) {
+            e.preventDefault();
+            const locker = lockersData[activeModalLockerId];
+            if (!locker) return;
+
+            const keyType = document.getElementById('borrow-key-type').value;
+            const empName = document.getElementById('borrow-emp-name').value.trim();
+            const empDept = document.getElementById('borrow-emp-dept').value.trim();
+            const note = document.getElementById('borrow-note').value.trim();
+
+            if (!keyType) {
+                showToast("ไม่สามารถเบิกได้เนื่องจากไม่มีกุญแจว่าง", "error");
+                return;
+            }
+
+            const nowStr = new Date().toLocaleString('th-TH');
+
+            if (keyType === 'MAIN') {
+                locker.mainKey = { isBorrowed: true, borrowerName: empName, department: empDept, borrowTime: nowStr, note: note };
+            } else {
+                locker.spareKey = { isBorrowed: true, borrowerName: empName, department: empDept, borrowTime: nowStr, note: note };
+            }
+
+            // Log entry
+            addLogEntry({
+                timestamp: nowStr,
+                lockerId: locker.id,
+                action: 'เบิกกุญแจ',
+                keyType: keyType === 'MAIN' ? 'ดอกใช้งานหลัก' : 'ดอกสำรอง',
+                empName: empName,
+                department: empDept,
+                note: note
+            });
+
+            saveDataToLocalStorage();
+            updateKPIs();
+            renderLockers();
+            closeModal();
+            showToast(`บันทึกเบิกกุญแจ ${locker.id} (${keyType === 'MAIN' ? 'ดอกหลัก' : 'ดอกสำรอง'}) สำเร็จ`);
+        }
+
+        // Action Handlers (Return Submit)
+        function handleReturnSubmit(e) {
+            e.preventDefault();
+            const locker = lockersData[activeModalLockerId];
+            if (!locker) return;
+
+            const keyType = document.getElementById('return-key-type').value;
+            const note = document.getElementById('return-note').value.trim();
+
+            if (!keyType) {
+                showToast("ไม่มีกุญแจที่ต้องคืน", "error");
+                return;
+            }
+
+            const nowStr = new Date().toLocaleString('th-TH');
+            let returnedBorrower = '';
+            let returnedDept = '';
+
+            if (keyType === 'MAIN') {
+                returnedBorrower = locker.mainKey.borrowerName;
+                returnedDept = locker.mainKey.department;
+                locker.mainKey = { isBorrowed: false, borrowerName: '', department: '', borrowTime: null, note: '' };
+            } else {
+                returnedBorrower = locker.spareKey.borrowerName;
+                returnedDept = locker.spareKey.department;
+                locker.spareKey = { isBorrowed: false, borrowerName: '', department: '', borrowTime: null, note: '' };
+            }
+
+            // Log entry
+            addLogEntry({
+                timestamp: nowStr,
+                lockerId: locker.id,
+                action: 'คืนกุญแจ',
+                keyType: keyType === 'MAIN' ? 'ดอกใช้งานหลัก' : 'ดอกสำรอง',
+                empName: returnedBorrower,
+                department: returnedDept,
+                note: note ? `(คืน) ${note}` : 'คืนกุญแจเรียบร้อย'
+            });
+
+            saveDataToLocalStorage();
+            updateKPIs();
+            renderLockers();
+            closeModal();
+            showToast(`บันทึกรับคืนกุญแจ ${locker.id} สำเร็จ`);
+        }
+
+        // Action Handlers (Repair / Damage Submit)
+        function handleRepairSubmit(e) {
+            e.preventDefault();
+            const locker = lockersData[activeModalLockerId];
+            if (!locker) return;
+
+            const action = document.getElementById('repair-status-action').value;
+            const note = document.getElementById('repair-note').value.trim();
+            const nowStr = new Date().toLocaleString('th-TH');
+
+            if (action === 'MARK_DAMAGED') {
+                locker.isDamaged = true;
+                locker.damageReason = note;
+
+                addLogEntry({
+                    timestamp: nowStr,
+                    lockerId: locker.id,
+                    action: 'แจ้งตู้ชำรุด',
+                    keyType: '-',
+                    empName: '-',
+                    department: '-',
+                    note: `อาการ: ${note}`
+                });
+                showToast(`บันทึกแจ้งตู้ ${locker.id} ชำรุดเรียบร้อย`);
+            } else {
+                locker.isDamaged = false;
+                locker.damageReason = '';
+
+                addLogEntry({
+                    timestamp: nowStr,
+                    lockerId: locker.id,
+                    action: 'ซ่อมแซมเสร็จสิ้น',
+                    keyType: '-',
+                    empName: '-',
+                    department: '-',
+                    note: 'ซ่อมแซมและเปิดใช้งานตามปกติ'
+                });
+                showToast(`อัปเดตตู้ ${locker.id} เป็นพร้อมใช้งานปกติ`);
+            }
+
+            saveDataToLocalStorage();
+            updateKPIs();
+            renderLockers();
+            closeModal();
+        }
+
+        // Add Record to System Log
+        function addLogEntry(entry) {
+            logsData.unshift(entry); // add to top
+            if (logsData.length > 500) logsData.pop(); // keep last 500 records
+            renderLogs();
+        }
+
+        // Render Transaction Logs List
+        function renderLogs() {
+            const container = document.getElementById('log-list');
+            const countBadge = document.getElementById('log-count-badge');
+            container.innerHTML = '';
+            countBadge.innerText = `${logsData.length} รายการ`;
+
+            if (logsData.length === 0) {
+                container.innerHTML = `
+                    <div class="py-12 text-center text-slate-400">
+                        <i class="fa-solid fa-history text-3xl mb-2 opacity-50"></i>
+                        <p class="text-xs">ยังไม่มีประวัติการเบิก-คืนกุญแจ</p>
+                    </div>
+                `;
+                return;
+            }
+
+            logsData.slice(0, 30).forEach(log => {
+                const item = document.createElement('div');
+                item.className = "p-3 rounded-xl bg-slate-50 border border-slate-200/80 text-xs flex flex-col gap-1 hover:bg-slate-100/70 transition";
+                
+                let actionBadge = "bg-indigo-100 text-indigo-700";
+                if (log.action === 'คืนกุญแจ') actionBadge = "bg-emerald-100 text-emerald-700";
+                if (log.action === 'แจ้งตู้ชำรุด') actionBadge = "bg-rose-100 text-rose-700";
+                if (log.action === 'ซ่อมแซมเสร็จสิ้น') actionBadge = "bg-blue-100 text-blue-700";
+
+                item.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-2">
+                            <span class="font-bold text-slate-800 bg-white px-2 py-0.5 rounded border border-slate-200">${log.lockerId}</span>
+                            <span class="px-2 py-0.5 rounded-full font-semibold ${actionBadge}">${log.action}</span>
+                        </div>
+                        <span class="text-[10px] text-slate-400">${log.timestamp}</span>
+                    </div>
+                    <div class="text-slate-600 mt-1">
+                        ${log.empName !== '-' ? `<div><strong>ผู้ทำรายการ:</strong> ${log.empName} (${log.department})</div>` : ''}
+                        ${log.keyType !== '-' ? `<div><strong>ประเภทกุญแจ:</strong> ${log.keyType}</div>` : ''}
+                        ${log.note ? `<div class="text-slate-500 italic mt-0.5">"${log.note}"</div>` : ''}
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        // Calculate Overview KPIs
+        function updateKPIs() {
+            let total = 190; // M01-M95 + F01-F95
+            let available = 0;
+            let borrowed = 0;
+            let damaged = 0;
+            let spareUsed = 0;
+
+            let maleCount = 0;
+            let femaleCount = 0;
+
+            Object.values(lockersData).forEach(locker => {
+                if (locker.gender === 'M') maleCount++;
+                if (locker.gender === 'F') femaleCount++;
+
+                if (locker.isDamaged) {
+                    damaged++;
+                }
+
+                if (locker.mainKey.isBorrowed || locker.spareKey.isBorrowed) {
+                    borrowed++;
+                }
+
+                if (!locker.isDamaged && !locker.mainKey.isBorrowed && !locker.spareKey.isBorrowed) {
+                    available++;
+                }
+
+                if (locker.spareKey.isBorrowed) {
+                    spareUsed++;
+                }
+            });
+
+            document.getElementById('stat-total').innerText = total;
+            document.getElementById('stat-available').innerText = available;
+            document.getElementById('stat-borrowed').innerText = borrowed;
+            document.getElementById('stat-damaged').innerText = damaged;
+            document.getElementById('stat-spare-used').innerText = spareUsed;
+
+            document.getElementById('badge-male-count').innerText = maleCount;
+            document.getElementById('badge-female-count').innerText = femaleCount;
+        }
+
+        // Export Data to Excel File (.xlsx) using SheetJS
+        function exportToExcel() {
+            if (typeof XLSX === 'undefined') {
+                showToast("ระบบยังโหลดไลบรารี Excel ไม่เสร็จสิ้น", "error");
+                return;
+            }
+
+            // 1. Prepare Current Locker Status Sheet Data
+            const statusRows = [];
+            Object.values(lockersData).sort((a, b) => a.id.localeCompare(b.id)).forEach(locker => {
+                statusRows.push({
+                    "รหัสล็อกเกอร์": locker.id,
+                    "เพศ/โซน": locker.gender === 'M' ? 'ชาย' : 'หญิง',
+                    "สถานะตู้": locker.isDamaged ? 'ชำรุด' : 'ปกติ',
+                    "สาเหตุการชำรุด": locker.damageReason || '-',
+                    "กุญแจหลัก (Key #1)": locker.mainKey.isBorrowed ? 'ถูกเบิก' : 'ว่าง',
+                    "ผู้เบิกกุญแจหลัก": locker.mainKey.borrowerName || '-',
+                    "แผนก (ผู้เบิกหลัก)": locker.mainKey.department || '-',
+                    "วันเวลาเบิกหลัก": locker.mainKey.borrowTime || '-',
+                    "กุญแจสำรอง (Key #2)": locker.spareKey.isBorrowed ? 'ถูกเบิก' : 'ว่าง',
+                    "ผู้เบิกกุญแจสำรอง": locker.spareKey.borrowerName || '-',
+                    "แผนก (ผู้เบิกสำรอง)": locker.spareKey.department || '-',
+                    "วันเวลาเบิกสำรอง": locker.spareKey.borrowTime || '-'
+                });
+            });
+
+            // 2. Prepare Audit Log Sheet Data
+            const logRows = logsData.map((log, index) => ({
+                "ลำดับ": logsData.length - index,
+                "วันเวลา": log.timestamp,
+                "รหัสตู้": log.lockerId,
+                "การทำรายการ": log.action,
+                "ประเภทกุญแจ": log.keyType,
+                "ชื่อ-นามสกุล พนักงาน": log.empName,
+                "แผนก": log.department,
+                "หมายเหตุ": log.note || '-'
+            }));
+
+            // Create Workbook
+            const wb = XLSX.utils.book_new();
+
+            const wsStatus = XLSX.utils.json_to_sheet(statusRows);
+            const wsLogs = XLSX.utils.json_to_sheet(logRows);
+
+            // Auto Column Widths Adjustment
+            const wscolsStatus = [
+                {wch: 12}, {wch: 10}, {wch: 12}, {wch: 25}, 
+                {wch: 15}, {wch: 20}, {wch: 15}, {wch: 20},
+                {wch: 15}, {wch: 20}, {wch: 15}, {wch: 20}
+            ];
+            wsStatus['!cols'] = wscolsStatus;
+
+            XLSX.utils.book_append_sheet(wb, wsStatus, "สถานะล็อกเกอร์ปัจจุบัน");
+            XLSX.utils.book_append_sheet(wb, wsLogs, "ประวัติการทำรายการ");
+
+            // Save File
+            const dateStr = new Date().toISOString().split('T')[0];
+            XLSX.writeFile(wb, `รายงานข้อมูลล็อกเกอร์_${dateStr}.xlsx`);
+            showToast("ส่งออกไฟล์ Excel เรียบร้อยแล้ว");
+        }
+
+        // Backup and Restore JSON functions
+        function openBackupModal() {
+            document.getElementById('backup-modal').classList.remove('hidden');
+        }
+
+        function closeBackupModal() {
+            document.getElementById('backup-modal').classList.add('hidden');
+        }
+
+        function downloadJSONBackup() {
+            const backupData = {
+                version: '1.0',
+                exportDate: new Date().toISOString(),
+                lockers: lockersData,
+                logs: logsData
+            };
+
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `locker_backup_${new Date().toISOString().split('T')[0]}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+            showToast("ดาวน์โหลดไฟล์สำรองข้อมูล JSON เรียบร้อยแล้ว");
+        }
+
+        function restoreJSONBackup() {
+            const fileInput = document.getElementById('import-json-file');
+            if (!fileInput.files || fileInput.files.length === 0) {
+                showToast("กรุณาเลือกไฟล์ JSON สำรองข้อมูลก่อน", "error");
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    if (imported.lockers) {
+                        lockersData = imported.lockers;
+                        logsData = imported.logs || [];
+                        saveDataToLocalStorage();
+                        updateKPIs();
+                        renderLockers();
+                        renderLogs();
+                        closeBackupModal();
+                        showToast("นำเข้าข้อมูลสำเร็จแล้ว");
+                    } else {
+                        showToast("รูปแบบไฟล์ JSON ไม่ถูกต้อง", "error");
+                    }
+                } catch (err) {
+                    showToast("เกิดข้อผิดพลาดในการอ่านไฟล์ JSON", "error");
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function confirmResetData() {
+            if (confirm("คุณแน่ใจหรือไม่ว่าต้องการรีเซ็ตข้อมูลล็อกเกอร์ทั้งหมดกลับเป็นค่าเริ่มต้น? (ข้อมูลการเบิกคืนจะถูกล้างหมด)")) {
+                localStorage.removeItem(STORAGE_LOCKERS_KEY);
+                localStorage.removeItem(STORAGE_LOGS_KEY);
+                generateDefaultLockers();
+                logsData = [];
+                saveDataToLocalStorage();
+                updateKPIs();
+                renderLockers();
+                renderLogs();
+                closeBackupModal();
+                showToast("รีเซ็ตระบบกลับเป็นค่าเริ่มต้นเรียบร้อยแล้ว");
+            }
+        }
+
+        // Toast Notification Helper
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toast-msg');
+            const toastIcon = document.getElementById('toast-icon');
+
+            toastMsg.innerText = message;
+
+            if (type === 'error') {
+                toastIcon.className = "fa-solid fa-circle-exclamation text-rose-400 text-base";
+            } else {
+                toastIcon.className = "fa-solid fa-circle-check text-emerald-400 text-base";
+            }
+
+            toast.classList.remove('translate-y-10', 'opacity-0', 'pointer-events-none');
+            toast.classList.add('translate-y-0', 'opacity-100');
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-10', 'opacity-0', 'pointer-events-none');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
